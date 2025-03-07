@@ -20,7 +20,7 @@ import { NewsEventsPage } from './pages/NewsEventsPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { ContactPage } from './pages/ContactPage';
 import { ConnectPage} from './pages/Connectpage';
-
+import { Analytics } from "@vercel/analytics/react"
 export default function App() {
   const { setUser } = useAuthStore();
 
@@ -45,6 +45,7 @@ export default function App() {
       <Toast />
       <div className="min-h-screen flex flex-col">
         <Header />
+	<Analytics />
         <main className="flex-grow">
           <Routes>
             {/* Public Routes */}
