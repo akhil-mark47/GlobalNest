@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Users, MapPin, BookOpen, Home, Briefcase } from 'lucide-react';
+import { Users, Home, Briefcase } from 'lucide-react';
+import { useAuthStore } from '../store/authStore'; // Import your auth store
 
 export const LandingPage = () => {
+  const user = useAuthStore((state) => state.user); // Get user state from Zustand
+
   return (
     <div className="bg-white">
       {/* Hero Section */}
@@ -24,7 +27,7 @@ export const LandingPage = () => {
             </p>
             <div className="mt-10 flex justify-center space-x-4">
               <Link
-                to="/signup"
+                to={user ? "/dashboard" : "/signup"}
                 className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 transition-colors"
               >
                 Get Started
@@ -55,37 +58,46 @@ export const LandingPage = () => {
 
           <div className="mt-20">
             <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+              {/* Student Housing */}
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
-                <div className="relative bg-white p-6 rounded-lg shadow-lg">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
-                    <Home className="h-6 w-6" />
+                <Link to={user ? "/housing" : "/signup"}>
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
+                  <div className="relative bg-white p-6 rounded-lg shadow-lg">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
+                      <Home className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-4">Safe Housing</h3>
+                    <p className="text-gray-600">Find verified housing options near your university with trusted hosts.</p>
                   </div>
-                  <h3 className="text-xl font-bold mb-4">Safe Housing</h3>
-                  <p className="text-gray-600">Find verified housing options near your university with trusted hosts.</p>
-                </div>
+                </Link>
               </div>
 
+              {/* Student Community */}
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
-                <div className="relative bg-white p-6 rounded-lg shadow-lg">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
-                    <Users className="h-6 w-6" />
+                <Link to={user ? "/community" : "/signup"}>
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
+                  <div className="relative bg-white p-6 rounded-lg shadow-lg">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-4">Student Community</h3>
+                    <p className="text-gray-600">Connect with fellow students and build lasting friendships.</p>
                   </div>
-                  <h3 className="text-xl font-bold mb-4">Student Community</h3>
-                  <p className="text-gray-600">Connect with fellow students and build lasting friendships.</p>
-                </div>
+                </Link>
               </div>
 
+              {/* Job Opportunities */}
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
-                <div className="relative bg-white p-6 rounded-lg shadow-lg">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
-                    <Briefcase className="h-6 w-6" />
+                <Link to={user ? "/jobs" : "/signup"}>
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-200"></div>
+                  <div className="relative bg-white p-6 rounded-lg shadow-lg">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 text-white mb-4">
+                      <Briefcase className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-4">Job Opportunities</h3>
+                    <p className="text-gray-600">Access student-friendly job listings and internship opportunities.</p>
                   </div>
-                  <h3 className="text-xl font-bold mb-4">Job Opportunities</h3>
-                  <p className="text-gray-600">Access student-friendly job listings and internship opportunities.</p>
-                </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -102,10 +114,10 @@ export const LandingPage = () => {
           <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
             <div className="inline-flex rounded-md shadow">
               <Link
-                to="/signup"
+                to={user ? "/dashboard" : "/signup"}
                 className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50"
               >
-                Sign up now
+                {user ? "Go to Dashboard" : "Sign up now"}
               </Link>
             </div>
           </div>
