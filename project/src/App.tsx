@@ -21,6 +21,7 @@ import { CommunityPage } from './pages/CommunityPage';
 import { ContactPage } from './pages/ContactPage';
 import { ConnectPage} from './pages/Connectpage';
 import { Analytics } from "@vercel/analytics/react"
+import { SessionsPage } from './pages/SessionsPage';
 export default function App() {
   const { setUser } = useAuthStore();
 
@@ -66,7 +67,7 @@ export default function App() {
               <Route path="/news-events" element={<NewsEventsPage />} />
               <Route path="/community" element={<CommunityPage />} />
               <Route path="/connect" element={<ConnectPage />} />
-
+              <Route path="/sessions" element={<SessionsPage />} />
             </Route>
           </Routes>
         </main>

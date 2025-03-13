@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Add useNavigate here
 import { Search, Filter, Star, Award, Clock, MapPin, Globe, ChevronDown, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
@@ -63,6 +63,7 @@ export const ConnectPage: React.FC = () => {
     duration: 60,
   });
   const [allExpertise, setAllExpertise] = useState<string[]>([]);
+  const navigate = useNavigate();
   // Add these new state variables
 const [selectedRating, setSelectedRating] = useState<number>(5);
 const [reviewComment, setReviewComment] = useState<string>('');
@@ -387,12 +388,69 @@ const checkExistingReview = async () => {
 
   const bookSession = async () => {
     if (!user || !selectedMentor || !bookingDetails.date || !bookingDetails.timeSlot) {
-      alert('Please select a date and time slot');
+      toast.error('Please select a date and time slot');
       return;
     }
     
-    // This would typically connect to a booking system or payment gateway
-    alert(`Session booked with ${selectedMentor.name} for ${bookingDetails.date} at ${bookingDetails.timeSlot} for ${bookingDetails.duration} minutes`);
+    try {
+      // Calculate the session amount based on hourly rate and duration
+      const amount = selectedMentor.hourly_rate * (bookingDetails.duration / 60);
+      
+      // First, insert the session in the database
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert({
+          mentor_id: selectedMentor.id,
+          user_id: user.id,
+          date: bookingDetails.date,
+          time_slot: bookingDetails.timeSlot,
+          duration: bookingDetails.duration,
+          status: 'upcoming',
+          payment_status: 'pending',  // Assuming payment is handled separately
+          amount: amount,
+          currency: selectedMentor.currency,
+          notes: `Session with ${selectedMentor.name} for ${bookingDetails.duration} minutes` 
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Success message
+ 
+
+      // Inside the bookSession function, after successful booking:
+      toast.success(
+        (t) => (
+          <div>
+            <p>Session booked successfully!</p>
+            <button 
+              onClick={() => {
+                toast.dismiss(t.id);
+                navigate(`/sessions#${data.id}`);
+              }}
+              className="mt-2 bg-white text-indigo-600 px-3 py-1 rounded-md text-sm hover:bg-indigo-50"
+            >
+              View My Sessions
+            </button>
+          </div>
+        ),
+        { duration: 5000 }
+      );
+      
+      // Reset booking form
+      setBookingDetails({
+        date: '',
+        timeSlot: '',
+        duration: 60,
+      });
+      
+      // Redirect to the sessions page
+      navigate(`/sessions#${data.id}`);
+    } catch (error) {
+      console.error('Error booking session:', error);
+      toast.error('Failed to book session. Please try again.');
+    }
   };
 
   const filteredMentors = mentors.filter(mentor => {
