@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Globe } from 'lucide-react';
-
+import logoImage from '../../utils/globalnest-logo.png';
 export const Footer = () => {
   return (
     <footer className="bg-gray-50">
@@ -10,7 +10,7 @@ export const Footer = () => {
           <div className="col-span-1">
             <div className="flex items-center space-x-2">
             <img
-        src="src\utils\Global Nest Inc..png"
+        src={logoImage}
         alt="GlobalNest Logo"
         className="h-8 w-8"
       />
