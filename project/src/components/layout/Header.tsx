@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { Globe, LogOut, Menu } from 'lucide-react';
 import { MobileNav } from './MobileNav';
+import logoImage from '../../utils/globalnest-logo.png';
 
 export const Header = () => {
   const { user, signOut } = useAuthStore();
@@ -17,14 +18,14 @@ export const Header = () => {
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <Link to="/" className="flex items-center space-x-2">
-          <img
-        src="./src/utils/Global Nest Inc..png"
-        alt="GlobalNest Logo"
-        className="h-8 w-8"
-      />
-            <span className="text-xl font-bold text-gray-900">GlobalNest</span>
-          </Link>
+        <Link to="/" className="flex items-center space-x-2">
+  <img
+    src={logoImage}
+    alt="GlobalNest Logo"
+    className="h-8 w-8"
+  />
+  <span className="text-xl font-bold text-gray-900">GlobalNest</span>
+</Link>
 
           {/* Mobile menu button */}
           <button

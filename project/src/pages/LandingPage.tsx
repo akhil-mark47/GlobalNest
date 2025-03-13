@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Home, Briefcase } from 'lucide-react';
 import { useAuthStore } from '../store/authStore'; // Import your auth store
+import logoImage from '../utils/globalnest-logo.png'; // Import your logo image
 
 export const LandingPage = () => {
   const user = useAuthStore((state) => state.user); // Get user state from Zustand
@@ -12,13 +13,13 @@ export const LandingPage = () => {
       <div className="relative bg-gradient-to-br from-indigo-900 to-purple-900">
         <div className="max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="flex justify-center mb-8">
-              <img
-                src="./src/utils/Global Nest Inc..png"
-                alt="GlobalNest Logo"
-                className="h-32 w-32 object-contain"
-              />
-            </div>
+          <div className="flex justify-center mb-8">
+          <img
+  src={logoImage}
+  alt="GlobalNest Logo"
+  className="h-32 w-32 object-contain"
+/>
+</div>
             <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
               GlobalNest
             </h1>
