@@ -14,7 +14,7 @@ export const LandingPage = () => {
           <div className="text-center">
             <div className="flex justify-center mb-8">
               <img
-                src="src/utils/Global Nest Inc..png"
+                src="./src/utils/Global Nest Inc..png"
                 alt="GlobalNest Logo"
                 className="h-32 w-32 object-contain"
               />

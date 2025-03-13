@@ -19,7 +19,7 @@ export const Header = () => {
         <div className="flex justify-between h-16 items-center">
           <Link to="/" className="flex items-center space-x-2">
           <img
-        src="src/utils/Global Nest Inc..png"
+        src="./src/utils/Global Nest Inc..png"
         alt="GlobalNest Logo"
         className="h-8 w-8"
       />
