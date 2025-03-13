@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Star, Award, Clock, MapPin, Globe, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Filter, Star, Award, Clock, MapPin, Globe, ChevronDown, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 
 // Type definitions based on your database schema
 interface Mentor {
@@ -37,10 +39,11 @@ interface Review {
   rating: number;
   comment: string;
   created_at: string;
-  user?: {
-    full_name: string;
-    avatar_url: string;
-  };
+  user: {
+    id: string;
+    name: string;
+    image_url: string | null;  // Changed from avatar_url to image_url
+  } | null;
 }
 
 export const ConnectPage: React.FC = () => {
@@ -60,7 +63,271 @@ export const ConnectPage: React.FC = () => {
     duration: 60,
   });
   const [allExpertise, setAllExpertise] = useState<string[]>([]);
+  // Add these new state variables
+const [selectedRating, setSelectedRating] = useState<number>(5);
+const [reviewComment, setReviewComment] = useState<string>('');
+const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+const [hasExistingReview, setHasExistingReview] = useState<boolean>(false);
+const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
+  
+// Add this to your useEffect that runs when selectedMentor changes
+useEffect(() => {
+  if (selectedMentor && user) {
+    checkExistingReview();
+  }
+}, [selectedMentor, user]);
 
+// Add this function to your ConnectPage component
+const deleteReview = async (reviewId: string) => {
+  if (!user) return;
+  
+  try {
+    setSubmitStatus('loading');
+    
+    const { error } = await supabase
+      .from('mentor_reviews')
+      .delete()
+      .eq('id', reviewId)
+      .eq('user_id', user.id); // Security: ensure user can only delete their own reviews
+    
+    if (error) throw error;
+    
+    toast.success('Review deleted successfully');
+    setSubmitStatus('idle');
+    
+    // Refresh reviews
+    if (selectedMentor) {
+      await fetchReviews(selectedMentor.id);
+      
+      // Refresh mentor data to update ratings
+      const { data: updatedMentor } = await supabase
+        .from('mentors')
+        .select('*')
+        .eq('id', selectedMentor.id)
+        .single();
+      
+      if (updatedMentor) {
+        setSelectedMentor(updatedMentor);
+      }
+    }
+    
+    // Reset form state
+    setSelectedRating(5);
+    setReviewComment('');
+    setHasExistingReview(false);
+    
+  } catch (error) {
+    console.error('Error deleting review:', error);
+    toast.error('Failed to delete review');
+    setSubmitStatus('error');
+  }
+};
+
+// Add this function at the top of your ConnectPage component, after your state definitions
+const getAvatarUrl = async (userId: string): Promise<string> => {
+  try {
+    // First check if the image exists in the storage bucket
+    const { data, error } = await supabase
+      .storage
+      .from('profile-images')
+      .list(`avatars/${userId}`);
+    
+    if (error) {
+      console.error('Error checking avatar existence:', error);
+      return '/alternate.jpg'; // Fallback to default image
+    }
+    
+    // If we have any files for this user
+    if (data && data.length > 0) {
+      // Get the public URL for the most recent image
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('profile-images')
+        .getPublicUrl(`avatars/${userId}/${data[0].name}`);
+      
+      return publicUrlData.publicUrl;
+    }
+    
+    return '/alternate.jpg'; // No images found, use default
+  } catch (error) {
+    console.error('Error fetching avatar from storage:', error);
+    return '/alternate.jpg'; // Fallback to default image
+  }
+};
+
+// Now update your fetchReviews function to use this helper
+const fetchReviews = async (mentorId: string) => {
+  try {
+    console.log('Fetching reviews for mentor:', mentorId);
+    
+    // First get the reviews
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from('mentor_reviews')
+      .select('*')
+      .eq('mentor_id', mentorId)
+      .order('created_at', { ascending: false });
+    
+    if (reviewsError) {
+      console.error('Supabase error fetching reviews:', reviewsError);
+      throw reviewsError;
+    }
+    
+    if (!reviewsData || reviewsData.length === 0) {
+      setReviews([]);
+      return;
+    }
+    
+    console.log('Raw reviews data:', reviewsData);
+    
+ // Then fetch user profiles for each review
+const enrichedReviews = await Promise.all(
+  reviewsData.map(async (review) => {
+    // Get the user profile for this review
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id, name, image_url')
+      .eq('id', review.user_id)
+      .single();
+    
+    let avatarUrl = '/alternate.jpg'; // Default avatar
+
+    // Try to get avatar from storage if not found in profile
+    if (!userData?.image_url || userData.image_url === '') {
+      avatarUrl = await getAvatarUrl(review.user_id);
+    } else {
+      avatarUrl = userData.image_url;
+    }
+    
+    if (userError) {
+      console.error(`Error fetching user ${review.user_id}:`, userError);
+      return {
+        ...review,
+        user: {
+          id: review.user_id,
+          name: 'Anonymous',
+          image_url: avatarUrl
+        }
+      };
+    }
+    
+    return {
+      ...review,
+      user: {
+        ...userData,
+        image_url: avatarUrl  // Return image_url instead of avatar_url
+      }
+    };
+  })
+);
+   
+    
+    console.log('Enriched reviews with user data:', enrichedReviews);
+    setReviews(enrichedReviews);
+    
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    toast.error('Failed to load reviews');
+  }
+};
+
+const handleSubmitReview = async () => {
+  if (!user || !selectedMentor) return;
+  
+  // Validate input
+  if (selectedRating < 1 || selectedRating > 5) {
+    toast.error('Please select a rating between 1 and 5 stars');
+    return;
+  }
+  
+  if (!reviewComment.trim() || reviewComment.length < 10) {
+    toast.error('Please enter a review comment (minimum 10 characters)');
+    return;
+  }
+  
+  setSubmitStatus('loading');
+  
+  try {
+    let result;
+    
+    if (hasExistingReview) {
+      // Update existing review
+      result = await supabase
+        .from('mentor_reviews')
+        .update({
+          rating: selectedRating,
+          comment: reviewComment
+        })
+        .eq('mentor_id', selectedMentor.id)
+        .eq('user_id', user.id);
+    } else {
+      // Insert new review
+      result = await supabase
+        .from('mentor_reviews')
+        .insert({
+          mentor_id: selectedMentor.id,
+          user_id: user.id,
+          rating: selectedRating,
+          comment: reviewComment
+        });
+    }
+    
+    if (result.error) throw result.error;
+    
+    // Success handling
+    setSubmitStatus('success');
+    toast.success('Review submitted successfully!');
+    
+    // Reset form after successful submission
+    if (!hasExistingReview) {
+      setSelectedRating(5);
+      setReviewComment('');
+    }
+    
+    // Refresh reviews
+    await fetchReviews(selectedMentor.id);
+    
+    // Reset status after delay
+    setTimeout(() => setSubmitStatus('idle'), 3000);
+    
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    setSubmitStatus('error');
+    toast.error('Failed to submit review. Please try again.');
+    setTimeout(() => setSubmitStatus('idle'), 3000);
+  }
+};
+// Add this function to check if the user has already reviewed this mentor
+// Updated checkExistingReview to store the review ID
+const checkExistingReview = async () => {
+  if (!user || !selectedMentor) return;
+  
+  try {
+    const { data, error } = await supabase
+      .from('mentor_reviews')
+      .select('id, rating, comment')
+      .eq('mentor_id', selectedMentor.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    
+    if (data) {
+      setHasExistingReview(true);
+      setExistingReviewId(data.id); // Store the existing review ID
+      // Pre-fill the form with existing review data
+      setSelectedRating(data.rating);
+      setReviewComment(data.comment);
+    } else {
+      setHasExistingReview(false);
+      setExistingReviewId(null);
+      // Reset form
+      setSelectedRating(5);
+      setReviewComment('');
+    }
+  } catch (error) {
+    console.error('Error checking existing review:', error);
+  }
+};
   useEffect(() => {
     fetchMentors();
   }, []);
@@ -94,29 +361,7 @@ export const ConnectPage: React.FC = () => {
     }
   };
 
-  const fetchReviews = async (mentorId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('mentor_reviews')
-        .select(`
-          *,
-          user:user_id (
-            full_name,
-            avatar_url
-          )
-        `)
-        .eq('mentor_id', mentorId)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      if (data) {
-        setReviews(data);
-      }
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-    }
-  };
+  // This fetchReviews function is already defined above
 
   const submitReview = async (rating: number, comment: string) => {
     if (!user || !selectedMentor) return;
@@ -323,7 +568,7 @@ export const ConnectPage: React.FC = () => {
                   
                   <div className="flex flex-col md:flex-row md:items-center">
                     <img 
-                      src={selectedMentor.image_url || '/default-avatar.png'} 
+                      src={selectedMentor.image_url || '/alternate.jpg'} 
                       alt={selectedMentor.name}
                       className="w-24 h-24 rounded-full object-cover border-4 border-white"
                     />
@@ -374,7 +619,7 @@ export const ConnectPage: React.FC = () => {
                           </div>
                           <div className="flex items-center">
                             <MapPin size={18} className="text-gray-500 mr-2" />
-                            <span className="text-gray-700">{selectedMentor.location}</span>
+                            <span className="text-gray-700">Location: {selectedMentor.location} </span>
                           </div>
                           <div className="flex items-center">
                             <Globe size={18} className="text-gray-500 mr-2" />
@@ -383,79 +628,194 @@ export const ConnectPage: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* Reviews Section */}
-                      <div className="mt-8">
-                        <h3 className="text-lg font-semibold mb-4">Reviews ({reviews.length})</h3>
-                        
-                        {reviews.length > 0 ? (
-                          <div className="space-y-6">
-                            {reviews.map(review => (
-                              <div key={review.id} className="bg-gray-50 p-4 rounded-lg">
-                                <div className="flex items-start">
-                                  <img 
-                                    src={review.user?.avatar_url || '/default-avatar.png'} 
-                                    alt={review.user?.full_name || 'User'} 
-                                    className="w-10 h-10 rounded-full object-cover mr-4"
-                                  />
-                                  <div>
-                                    <div className="flex items-center">
-                                      <span className="font-medium">{review.user?.full_name || 'Anonymous'}</span>
-                                      <div className="flex ml-2">
-                                        {renderStars(review.rating)}
-                                      </div>
-                                    </div>
-                                    <p className="text-gray-600 text-sm mt-1">
-                                      {new Date(review.created_at).toLocaleDateString()}
-                                    </p>
-                                    <p className="mt-2">{review.comment}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500">No reviews yet.</p>
-                        )}
-                        
-                        {/* Add review form */}
-                        {user && (
-                          <div className="mt-6 bg-white p-4 rounded-lg border">
-                            <h4 className="font-medium mb-2">Write a Review</h4>
-                            <div className="flex items-center mb-3">
-                              <div className="flex mr-2">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                  <button 
-                                    key={star}
-                                    onClick={() => {
-                                      const rating = document.getElementById('review-rating') as HTMLInputElement;
-                                      rating.value = star.toString();
-                                    }}
-                                    className="text-gray-300 hover:text-yellow-400 focus:text-yellow-400"
-                                  >
-                                    <Star size={20} />
-                                  </button>
-                                ))}
-                              </div>
-                              <input type="hidden" id="review-rating" value="5" />
-                            </div>
-                            <textarea
-                              id="review-comment"
-                              className="w-full border rounded p-2 h-24"
-                              placeholder="Share your experience with this mentor..."
-                            ></textarea>
-                            <button 
-                              onClick={() => {
-                                const rating = (document.getElementById('review-rating') as HTMLInputElement).value;
-                                const comment = (document.getElementById('review-comment') as HTMLTextAreaElement).value;
-                                submitReview(parseInt(rating), comment);
-                              }}
-                              className="mt-2 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                            >
-                              Submit Review
-                            </button>
-                          </div>
-                        )}
-                      </div>
+<div className="mt-8">
+  <h3 className="text-lg font-semibold mb-4">Reviews ({reviews.length})</h3>
+  
+  {reviews.length > 0 ? (
+    <div className="space-y-6">
+      {reviews.map(review => {
+        // Check if this review belongs to the current user
+        const isUserReview = user && review.user_id === user.id;
+        
+        return (
+          <div 
+            key={review.id} 
+            className={`${isUserReview ? 'bg-indigo-50 border border-indigo-100' : 'bg-gray-50'} p-4 rounded-lg`}
+          >
+
+<div className="flex items-start">
+  <img 
+    src={review.user?.image_url || '/alternate.jpg'} 
+    alt={review.user?.name || 'User'} 
+    className="w-10 h-10 rounded-full object-cover mr-4"
+    onError={(e) => {
+      // If image fails to load, use default image
+      e.currentTarget.src = '/alternate.jpg';
+    }}
+  />
+  <div className="flex-1">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center">
+        <span className="font-medium">{review.user?.name || 'Anonymous'}</span>
+        {isUserReview && (
+          <span className="ml-2 bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">
+            You
+          </span>
+        )}
+        <div className="flex ml-2">
+          {renderStars(review.rating)}
+        </div>
+      </div>
+      
+      {/* Allow users to edit or delete their own reviews */}
+      {isUserReview && (
+        <div className="flex space-x-2">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              // Pre-fill form with existing review
+              setSelectedRating(review.rating);
+              setReviewComment(review.comment);
+              // Scroll to review form
+              document.getElementById('review-form')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+              });
+            }}
+            className="text-indigo-600 hover:text-indigo-800"
+            title="Edit your review"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm('Are you sure you want to delete your review?')) {
+                deleteReview(review.id);
+              }
+            }}
+            className="text-red-600 hover:text-red-800"
+            title="Delete your review"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+    <p className="text-gray-600 text-sm mt-1">
+      {new Date(review.created_at).toLocaleDateString()}
+    </p>
+    <p className="mt-2">{review.comment}</p>
+  </div>
+</div>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <p className="text-gray-500">No reviews yet. Be the first to review this mentor!</p>
+  )}
+  
+{/* Add review form - Enhanced */}
+{user ? (
+  <div id="review-form" className="mt-6 bg-white p-4 rounded-lg border">
+    <h4 className="font-medium mb-2">
+      {hasExistingReview ? 'Update Your Review' : 'Write a Review'}
+    </h4>
+    
+    {/* Star Rating with better interaction */}
+    <div className="mb-3">
+      <p className="text-sm text-gray-700 mb-1">Your Rating</p>
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map(star => (
+          <button 
+            key={star}
+            type="button"
+            onClick={() => setSelectedRating(star)}
+            className="p-1 focus:outline-none"
+          >
+            <Star 
+              size={24} 
+              className={`${star <= selectedRating 
+                ? 'fill-yellow-400 text-yellow-400' 
+                : 'text-gray-300 hover:text-yellow-200'}`} 
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+    
+    {/* Comment field with character counter */}
+    <div className="mb-2">
+      <p className="text-sm text-gray-700 mb-1">Your Review</p>
+      <textarea
+        value={reviewComment}
+        onChange={(e) => setReviewComment(e.target.value)}
+        className="w-full border rounded-md p-2 h-24 focus:ring-indigo-500 focus:border-indigo-500"
+        placeholder="Share your experience with this mentor..."
+        maxLength={500}
+      ></textarea>
+      <div className="flex justify-end">
+        <span className="text-xs text-gray-500">{reviewComment.length}/500</span>
+      </div>
+    </div>
+    
+    {/* Review submission with state feedback */}
+    <div className="flex items-center justify-between mt-3">
+      <div>
+        {/* Status messages */}
+        {submitStatus === 'error' && (
+          <p className="text-red-500 text-sm">Failed to submit review. Please try again.</p>
+        )}
+        {submitStatus === 'success' && (
+          <p className="text-green-500 text-sm">Review submitted successfully!</p>
+        )}
+        {hasExistingReview && submitStatus === 'idle' && (
+          <p className="text-amber-500 text-sm">You'll update your previous review.</p>
+        )}
+      </div>
+      
+      <div className="flex space-x-2">
+        {hasExistingReview && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedRating(5);
+              setReviewComment('');
+              setHasExistingReview(false);
+            }}
+            className="px-4 py-2 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        )}
+        
+        <button 
+          onClick={handleSubmitReview}
+          className={`px-4 py-2 rounded font-medium flex items-center
+            ${submitStatus === 'loading' 
+              ? 'bg-indigo-400 cursor-not-allowed' 
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+          disabled={submitStatus === 'loading'}
+        >
+          {submitStatus === 'loading' ? (
+            <>
+              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              Submitting...
+            </>
+          ) : (
+            hasExistingReview ? 'Update Review' : 'Submit Review'
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+) : (
+  <div className="mt-6 bg-gray-50 p-4 rounded-lg border text-center">
+    <p className="text-gray-600">Please <Link to="/login" className="text-indigo-600 hover:text-indigo-800 font-medium">log in</Link> to leave a review.</p>
+  </div>
+)}
+</div>
                     </div>
                     
                     {/* Right Column: Booking */}
