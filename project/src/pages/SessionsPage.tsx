@@ -199,11 +199,26 @@ export const SessionsPage: React.FC = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
   
-  const formatTime = (timeSlot: string) => {
-    return new Date(`2000-01-01T${timeSlot}`).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // Updated formatTime function with better error handling
+  const formatTime = (timeSlot: string): string => {
+    try {
+      // Handle time formats like "HH:MM:SS" or "HH:MM"
+      const timeComponents = timeSlot.split(':');
+      const hours = parseInt(timeComponents[0], 10);
+      const minutes = parseInt(timeComponents[1], 10);
+      
+      // Create a date object and set the hours and minutes
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      
+      return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return timeSlot; // Return the original value as fallback
+    }
   };
   
   const renderStars = (rating: number) => {
@@ -219,13 +234,30 @@ export const SessionsPage: React.FC = () => {
     ));
   };
 
-  // Check if a session is within 15 minutes of starting
+  // Updated isSessionStartingSoon with better error handling
   const isSessionStartingSoon = (date: string, timeSlot: string): boolean => {
-    const sessionDateTime = new Date(`${date}T${timeSlot}`);
-    const now = new Date();
-    const timeDiff = sessionDateTime.getTime() - now.getTime();
-    // Return true if session starts in less than 15 minutes but hasn't started yet
-    return timeDiff > 0 && timeDiff <= 15 * 60 * 1000;
+    try {
+      // Create a date object from the session date
+      const sessionDate = new Date(date);
+      
+      // Parse the time slot (expected format: "HH:MM:SS" or "HH:MM")
+      const timeComponents = timeSlot.split(':');
+      const hours = parseInt(timeComponents[0], 10);
+      const minutes = parseInt(timeComponents[1], 10);
+      const seconds = timeComponents.length > 2 ? parseInt(timeComponents[2], 10) : 0;
+      
+      // Set the time components on the session date
+      sessionDate.setHours(hours, minutes, seconds);
+      
+      const now = new Date();
+      const timeDiff = sessionDate.getTime() - now.getTime();
+      
+      // Return true if session starts in less than 15 minutes but hasn't started yet
+      return timeDiff > 0 && timeDiff <= 15 * 60 * 1000;
+    } catch (error) {
+      console.error("Error calculating if session is starting soon:", error);
+      return false;
+    }
   };
 
   // Format the price with proper currency
@@ -422,7 +454,7 @@ export const SessionsPage: React.FC = () => {
                         </div>
                         {session.payment_status.charAt(0).toUpperCase() + session.payment_status.slice(1)}
                       </div>
-                      {session.mentor.expertise.slice(0, 2).map((skill, index) => (
+                      {session.mentor.expertise && session.mentor.expertise.slice(0, 2).map((skill, index) => (
                         <span key={index} className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs">
                           {skill}
                         </span>
@@ -580,7 +612,7 @@ export const SessionsPage: React.FC = () => {
                 <div>
                   <p className="text-gray-500 text-sm">Total Hours</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {(sessions.reduce((acc, session) => acc + session.duration, 0) / 60).toFixed(1)}
+                    {(sessions.reduce((acc, session) => acc + (session.duration || 0), 0) / 60).toFixed(1)}
                   </p>
                 </div>
               </div>
@@ -606,7 +638,7 @@ export const SessionsPage: React.FC = () => {
                 <div>
                   <p className="text-gray-500 text-sm">Different Mentors</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {new Set(sessions.map(s => s.mentor_id)).size}
+                    {new Set(sessions.filter(s => s.mentor_id).map(s => s.mentor_id)).size}
                   </p>
                 </div>
               </div>
